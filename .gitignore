@@ -102,4 +102,5 @@ ENV/
 .ropeproject
 .venv/
 environment/frontend_server/storage/*
+environment/frontend_server/compressed_storage/*
 environment/backend_server/storage/*
