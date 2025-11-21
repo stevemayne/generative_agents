@@ -266,7 +266,14 @@ def generate_action_event_triple(act_desp, persona):
 
 def generate_act_obj_desc(act_game_object, act_desp, persona): 
   if debug: print ("GNS FUNCTION: <generate_act_obj_desc>")
-  return run_gpt_prompt_act_obj_desc(act_game_object, act_desp, persona)[0]
+  try:
+    result = run_gpt_prompt_act_obj_desc(act_game_object, act_desp, persona)
+  except Exception:
+    result = None
+  # Result is expected to be a tuple: (output, meta). Guard against None/empty.
+  if not result or result[0] is None or str(result[0]).strip() == "":
+    return f"{act_game_object} is idle"
+  return result[0]
 
 
 def generate_act_obj_event_triple(act_game_object, act_obj_desc, persona): 

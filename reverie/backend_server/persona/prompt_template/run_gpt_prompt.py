@@ -361,57 +361,82 @@ def run_gpt_prompt_task_decomp(persona,
     print (gpt_response)
     print ("-==- -==- -==- ")
 
-    # TODO SOMETHING HERE sometimes fails... See screenshot
-    temp = [i.strip() for i in gpt_response.split("\n")]
-    _cr = []
-    cr = []
-    for count, i in enumerate(temp): 
-      if count != 0: 
-        _cr += [" ".join([j.strip () for j in i.split(" ")][3:])]
-      else: 
-        _cr += [i]
-    for count, i in enumerate(_cr): 
-      k = [j.strip() for j in i.split("(duration in minutes:")]
-      task = k[0]
-      if task[-1] == ".": 
-        task = task[:-1]
-      duration = int(k[1].split(",")[0].strip())
-      cr += [[task, duration]]
+    # Robustly parse lines like:
+    #   1) <task text> (duration in minutes: N)
+    # and ignore empty or malformed lines gracefully.
+    lines = [ln.strip() for ln in gpt_response.split("\n") if ln.strip()]
+    parsed = []
+    for idx, ln in enumerate(lines):
+      if "(duration in minutes:" not in ln:
+        continue
+      # Remove common numbering prefixes like "1) ", "- ", etc.
+      ln_core = re.sub(r"^\s*\d+\)\s*", "", ln).strip()
+      ln_core = re.sub(r"^\s*[-•]\s*", "", ln_core).strip()
+      # Split task and duration
+      parts = ln_core.split("(duration in minutes:")
+      task_name = parts[0].strip()
+      if task_name.endswith(".") or task_name.endswith(","):
+        task_name = task_name[:-1].strip()
+      # Extract integer duration safely
+      m = re.search(r"\(duration in minutes:\s*(\d+)", ln_core)
+      if not m:
+        continue
+      try:
+        duration_min = int(m.group(1))
+      except Exception:
+        continue
+      if task_name:
+        parsed.append([task_name, max(0, duration_min)])
 
-    total_expected_min = int(prompt.split("(total duration in minutes")[-1]
-                                   .split("):")[0].strip())
-    
-    # TODO -- now, you need to make sure that this is the same as the sum of 
-    #         the current action sequence. 
-    curr_min_slot = [["dummy", -1],] # (task_name, task_index)
-    for count, i in enumerate(cr): 
-      i_task = i[0] 
-      i_duration = i[1]
+    # Derive expected total minutes from the prompt (fallback to 0 if not found)
+    try:
+      total_expected_min = int(
+        prompt.split("(total duration in minutes")[-1].split("):")[0].strip()
+      )
+    except Exception:
+      total_expected_min = 0
 
-      i_duration -= (i_duration % 5)
-      if i_duration > 0: 
-        for j in range(i_duration): 
-          curr_min_slot += [(i_task, count)]       
-    curr_min_slot = curr_min_slot[1:]   
+    # If parsing failed, fall back to a single-block plan using the outer task.
+    if not parsed:
+      outer_task_name = task if isinstance(task, str) and task else "task"
+      if total_expected_min <= 0:
+        total_expected_min = duration if isinstance(duration, int) else 0
+      return [[outer_task_name, max(0, total_expected_min)]]
 
-    if len(curr_min_slot) > total_expected_min: 
-      last_task = curr_min_slot[60]
-      for i in range(1, 6): 
-        curr_min_slot[-1 * i] = last_task
-    elif len(curr_min_slot) < total_expected_min: 
-      last_task = curr_min_slot[-1]
-      for i in range(total_expected_min - len(curr_min_slot)):
-        curr_min_slot += [last_task]
+    # Normalize into 1-minute slots rounded to 5-minute increments.
+    curr_min_slot = []  # list of (task_name, index)
+    for idx, (tname, tdur) in enumerate(parsed):
+      tdur = int(tdur) if isinstance(tdur, int) else 0
+      tdur -= (tdur % 5)
+      if tdur <= 0:
+        continue
+      curr_min_slot.extend([(tname, idx)] * tdur)
 
-    cr_ret = [["dummy", -1],]
-    for task, task_index in curr_min_slot: 
-      if task != cr_ret[-1][0]: 
-        cr_ret += [[task, 1]]
-      else: 
+    # Ensure we have something to work with.
+    if not curr_min_slot:
+      outer_task_name = task if isinstance(task, str) and task else "task"
+      if total_expected_min <= 0:
+        total_expected_min = duration if isinstance(duration, int) else 0
+      return [[outer_task_name, max(0, total_expected_min)]]
+
+    # Adjust to match the expected total minutes if we have it.
+    if total_expected_min > 0:
+      if len(curr_min_slot) > total_expected_min:
+        # Truncate and keep last slot identity stable.
+        curr_min_slot = curr_min_slot[:total_expected_min]
+      elif len(curr_min_slot) < total_expected_min:
+        last_task = curr_min_slot[-1]
+        curr_min_slot.extend([last_task] * (total_expected_min - len(curr_min_slot)))
+
+    # Compress consecutive minutes back into (task, duration) blocks.
+    cr_ret = []
+    for tname, _idx in curr_min_slot:
+      if not cr_ret or cr_ret[-1][0] != tname:
+        cr_ret.append([tname, 1])
+      else:
         cr_ret[-1][1] += 1
-    cr = cr_ret[1:]
 
-    return cr
+    return cr_ret
 
   def __func_validate(gpt_response, prompt=""): 
     # TODO -- this sometimes generates error 
@@ -470,7 +495,11 @@ def run_gpt_prompt_task_decomp(persona,
     ftime_sum += fi_duration
   
   # print ("for debugging... line 365", fin_output)
-  fin_output[-1][1] += (duration - ftime_sum)
+  # Guard against empty output; if empty, fall back to the outer task.
+  if not fin_output:
+    fin_output = [[task, duration]]
+  else:
+    fin_output[-1][1] += (duration - ftime_sum)
   output = fin_output 
 
 
@@ -836,8 +865,10 @@ def run_gpt_prompt_pronunciatio(action_description, persona, verbose=False):
   fail_safe = get_fail_safe()
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
-    return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  # Always return a value; if ChatGPT parsing fails, fall back to fail_safe.
+  if output is False or output is None or str(output).strip() == "":
+    output = fail_safe
+  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -1012,8 +1043,10 @@ def run_gpt_prompt_act_obj_desc(act_game_object, act_desp, persona, verbose=Fals
   fail_safe = get_fail_safe(act_game_object) ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
-    return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  # Always return an integer; fallback to fail_safe on failure.
+  if output is False or output is None or str(output).strip() == "":
+    output = fail_safe
+  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -1637,8 +1670,10 @@ def run_gpt_prompt_summarize_conversation(persona, conversation, test_input=None
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
-    return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  # Always return an integer; fallback to fail_safe on failure.
+  if output is False or output is None or str(output).strip() == "":
+    output = fail_safe
+  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -1890,8 +1925,10 @@ def run_gpt_prompt_event_poignancy(persona, event_description, test_input=None, 
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
-    return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  # Always return an integer; fallback to fail_safe on failure.
+  if output is False or output is None or str(output).strip() == "":
+    output = fail_safe
+  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -2909,9 +2946,6 @@ def run_gpt_generate_iterative_chat_utt(maze, init_persona, target_persona, retr
                "temperature": 0, "top_p": 1, "stream": False,
                "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
   return output, [output, prompt, gpt_param, prompt_input, fail_safe]
-
-
-
 
 
 

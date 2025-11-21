@@ -4,13 +4,7 @@ Author: Joon Sung Park (joonspk@stanford.edu)
 File: gpt_structure.py
 Description: Wrapper functions for calling OpenAI APIs.
 """
-import json
-import random
-import openai
-import time 
-
-from utils import *
-openai.api_key = openai_api_key
+from utils import create_completion
 
 def ChatGPT_request(prompt): 
   """
@@ -26,14 +20,11 @@ def ChatGPT_request(prompt):
   """
   # temp_sleep()
   try: 
-    completion = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo", 
-    messages=[{"role": "user", "content": prompt}]
-    )
+    completion = create_completion(prompt)
     return completion["choices"][0]["message"]["content"]
   
-  except: 
-    print ("ChatGPT ERROR")
+  except Exception as e: 
+    print (f"ChatGPT ERROR: {e}")
     return "ChatGPT ERROR"
 
 prompt = """

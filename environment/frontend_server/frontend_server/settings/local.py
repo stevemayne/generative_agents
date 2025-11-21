@@ -43,7 +43,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
+    # Intentionally exclude SecurityMiddleware in local dev to avoid
+    # any HTTPS-related redirects or HSTS behavior.
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     # 'django.middleware.csrf.CsrfViewMiddleware',
@@ -136,7 +137,19 @@ MEDIA_ROOT = os.path.join(os.path.dirname(BASE_DIR), "media_root")
 
 
 
+# --- Local development security overrides ---
+# Ensure Django never forces HTTPS locally, even behind proxies.
+SECURE_SSL_REDIRECT = False
+SECURE_HSTS_SECONDS = 0
+SECURE_PROXY_SSL_HEADER = None
+SECURE_REDIRECT_EXEMPT = [r'.*']
 
+# Allow cookies to be sent over HTTP in local dev.
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+
+# Avoid trusting proxy headers locally.
+USE_X_FORWARDED_HOST = False
 
 
 
