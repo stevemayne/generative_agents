@@ -5,20 +5,27 @@ File: converse.py
 Description: An extra cognitive module for generating conversations.
 """
 
-import math
 import sys
 import datetime
-import random
 
 sys.path.append("../")
 
-from global_methods import *
-
-from persona.memory_structures.spatial_memory import *
-from persona.memory_structures.associative_memory import *
-from persona.memory_structures.scratch import *
-from persona.cognitive_modules.retrieve import *
-from persona.prompt_template.run_gpt_prompt import *
+from persona.prompt_template.gpt_structure import get_embedding
+from persona.cognitive_modules.retrieve import new_retrieve
+from persona.prompt_template.run_gpt_prompt import (
+    run_gpt_prompt_agent_chat_summarize_ideas,
+    run_gpt_prompt_agent_chat_summarize_relationship,
+    run_gpt_prompt_agent_chat,
+    run_gpt_generate_iterative_chat_utt,
+    run_gpt_prompt_summarize_ideas,
+    run_gpt_prompt_generate_next_convo_line,
+    run_gpt_prompt_generate_whisper_inner_thought,
+    run_gpt_prompt_event_triple,
+    run_gpt_prompt_event_poignancy,
+    run_gpt_prompt_chat_poignancy,
+    run_gpt_generate_safety_score,
+)
+from utils import debug
 
 
 def generate_agent_chat_summarize_ideas(
@@ -36,7 +43,8 @@ def generate_agent_chat_summarize_ideas(
         summarized_idea = run_gpt_prompt_agent_chat_summarize_ideas(
             init_persona, target_persona, all_embedding_key_str, curr_context
         )[0]
-    except:
+    except Exception as e:
+        print(f"ERROR in generate_agent_chat_summarize_ideas: {e}")
         summarized_idea = ""
     return summarized_idea
 
@@ -83,7 +91,7 @@ def agent_chat_v1(maze, init_persona, target_persona):
     )
     curr_context += (
         f"{init_persona.scratch.name} "
-        + f"is thinking of initating a conversation with "
+        + "is thinking of initating a conversation with "
         + f"{target_persona.scratch.name}."
     )
 
@@ -124,7 +132,7 @@ def generate_one_utterance(maze, init_persona, target_persona, retrieved, curr_c
     )
     curr_context += (
         f"{init_persona.scratch.name} "
-        + f"is initiating a conversation with "
+        + "is initiating a conversation with "
         + f"{target_persona.scratch.name}."
     )
 
