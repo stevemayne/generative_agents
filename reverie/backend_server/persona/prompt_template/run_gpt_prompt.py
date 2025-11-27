@@ -6,17 +6,23 @@ Description: Defines all run gpt prompt functions. These functions directly
 interface with the safe_generate_response function.
 """
 
+import json
 import random
 import re
 import datetime
+import string
 import sys
 import ast
 
 sys.path.append("../../")
 
 from utils import debug
-from global_methods import *
-from persona.prompt_template.gpt_structure import generate_prompt, safe_generate_response, ChatGPT_safe_generate_response
+from persona.prompt_template.gpt_structure import (
+    ChatGPT_safe_generate_response_OLD, 
+    generate_prompt, 
+    safe_generate_response, 
+    ChatGPT_safe_generate_response,
+)
 from persona.prompt_template.print_prompt import print_run_prompts
 
 
@@ -210,10 +216,10 @@ def run_gpt_prompt_generate_hourly_schedule(
         schedule_format = ""
         for i in hour_str:
             schedule_format += f"[{persona.scratch.get_str_curr_date_str()} -- {i}]"
-            schedule_format += f" Activity: [Fill in]\n"
+            schedule_format += " Activity: [Fill in]\n"
         schedule_format = schedule_format[:-1]
 
-        intermission_str = f"Here the originally intended hourly breakdown of"
+        intermission_str = "Here the originally intended hourly breakdown of"
         intermission_str += f" {persona.scratch.get_str_firstname()}'s schedule today: "
         for count, i in enumerate(persona.scratch.daily_req):
             intermission_str += f"{str(count + 1)}) {i}, "

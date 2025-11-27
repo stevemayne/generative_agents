@@ -9,14 +9,33 @@ import datetime
 import math
 import random
 import sys
-import time
 
 sys.path.append("../../")
 
-from global_methods import *
-from persona.prompt_template.run_gpt_prompt import *
-from persona.cognitive_modules.retrieve import *
-from persona.cognitive_modules.converse import *
+from utils import debug
+from persona.prompt_template.gpt_structure import (
+    ChatGPT_single_request, 
+    get_embedding,
+)
+from persona.prompt_template.run_gpt_prompt import (
+    run_gpt_prompt_decide_to_react,
+    run_gpt_prompt_decide_to_talk,
+    run_gpt_prompt_new_decomp_schedule,
+    run_gpt_prompt_summarize_conversation,
+    run_gpt_prompt_wake_up_hour,
+    run_gpt_prompt_daily_plan,
+    run_gpt_prompt_generate_hourly_schedule,
+    run_gpt_prompt_task_decomp,
+    run_gpt_prompt_action_sector,
+    run_gpt_prompt_action_arena,
+    run_gpt_prompt_action_game_object,
+    run_gpt_prompt_pronunciatio,
+    run_gpt_prompt_event_triple,
+    run_gpt_prompt_act_obj_desc,
+    run_gpt_prompt_act_obj_event_triple,
+)
+from persona.cognitive_modules.retrieve import new_retrieve
+from persona.cognitive_modules.converse import agent_chat_v2
 
 ##############################################################################
 # CHAPTER 2: Generate
@@ -278,7 +297,8 @@ def generate_action_pronunciatio(act_desp, persona):
         print("GNS FUNCTION: <generate_action_pronunciatio>")
     try:
         x = run_gpt_prompt_pronunciatio(act_desp, persona)[0]
-    except:
+    except Exception as e:
+        print(f"ERROR in generate_action_pronunciatio: {e}")
         x = "🙂"
 
     if not x:
@@ -324,7 +344,7 @@ def generate_act_obj_event_triple(act_game_object, act_obj_desc, persona):
 
 
 def generate_convo(maze, init_persona, target_persona):
-    curr_loc = maze.access_tile(init_persona.scratch.curr_tile)
+    _curr_loc = maze.access_tile(init_persona.scratch.curr_tile)
 
     # convo = run_gpt_prompt_create_conversation(init_persona, target_persona, curr_loc)[0]
     # convo = agent_chat_v1(maze, init_persona, target_persona)
@@ -431,7 +451,7 @@ def generate_new_decomp_schedule(
         dur_sum += dur
         count += 1
 
-    persona_name = persona.name
+    #persona_name = persona.name
     main_act_dur = main_act_dur
 
     x = (
@@ -496,7 +516,7 @@ def revise_identity(persona):
     plan_prompt = statements + "\n"
     plan_prompt += f"Given the statements above, is there anything that {p_name} should remember as they plan for"
     plan_prompt += f" *{persona.scratch.curr_time.strftime('%A %B %d')}*? "
-    plan_prompt += f"If there is any scheduling information, be as specific as possible (include date, time, and location if stated in the statement)\n\n"
+    plan_prompt += "If there is any scheduling information, be as specific as possible (include date, time, and location if stated in the statement)\n\n"
     plan_prompt += f"Write the response from {p_name}'s perspective."
     plan_note = ChatGPT_single_request(plan_prompt)
     # print (plan_note)
@@ -512,7 +532,7 @@ def revise_identity(persona):
     currently_prompt += f"{p_name}'s thoughts at the end of {(persona.scratch.curr_time - datetime.timedelta(days=1)).strftime('%A %B %d')}:\n"
     currently_prompt += (plan_note + thought_note).replace("\n", "") + "\n\n"
     currently_prompt += f"It is now {persona.scratch.curr_time.strftime('%A %B %d')}. Given the above, write {p_name}'s status for {persona.scratch.curr_time.strftime('%A %B %d')} that reflects {p_name}'s thoughts at the end of {(persona.scratch.curr_time - datetime.timedelta(days=1)).strftime('%A %B %d')}. Write this in third-person talking about {p_name}."
-    currently_prompt += f"If there is any scheduling information, be as specific as possible (include date, time, and location if stated in the statement).\n\n"
+    currently_prompt += "If there is any scheduling information, be as specific as possible (include date, time, and location if stated in the statement).\n\n"
     currently_prompt += "Follow this format below:\nStatus: <new status>"
     # print ("DEBUG ;adjhfno;asdjao;asdfsidfjo;af", p_name)
     # print (currently_prompt)
@@ -525,9 +545,9 @@ def revise_identity(persona):
     daily_req_prompt = persona.scratch.get_str_iss() + "\n"
     daily_req_prompt += f"Today is {persona.scratch.curr_time.strftime('%A %B %d')}. Here is {persona.scratch.name}'s plan today in broad-strokes (with the time of the day. e.g., have a lunch at 12:00 pm, watch TV from 7 to 8 pm).\n\n"
     daily_req_prompt += (
-        f"Follow this format (the list should have 4~6 items but no more):\n"
+        "Follow this format (the list should have 4~6 items but no more):\n"
     )
-    daily_req_prompt += f"1. wake up and complete the morning routine at <time>, 2. ..."
+    daily_req_prompt += "1. wake up and complete the morning routine at <time>, 2. ..."
 
     new_daily_req = ChatGPT_single_request(daily_req_prompt)
     new_daily_req = new_daily_req.replace("\n", " ")
@@ -960,9 +980,9 @@ def _create_react(
     start_index = None
     end_index = None
     for act, dur in p.scratch.f_daily_schedule:
-        if dur_sum >= start_hour * 60 and start_index == None:
+        if dur_sum >= start_hour * 60 and start_index is None:
             start_index = count
-        if dur_sum >= end_hour * 60 and end_index == None:
+        if dur_sum >= end_hour * 60 and end_index is None:
             end_index = count
         dur_sum += dur
         count += 1
@@ -993,7 +1013,7 @@ def _chat_react(maze, persona, focused_event, reaction_mode, personas):
     # and the persona who is the target. We get the persona instances here.
     init_persona = persona
     target_persona = personas[reaction_mode[9:].strip()]
-    curr_personas = [init_persona, target_persona]
+    #curr_personas = [init_persona, target_persona]
 
     # Actually creating the conversation here.
     convo, duration_min = generate_convo(maze, init_persona, target_persona)

@@ -46,8 +46,8 @@ def GPT4_request(prompt):
         completion = create_completion(prompt)
         return completion["choices"][0]["message"]["content"]
 
-    except:
-        print("ChatGPT ERROR")
+    except Exception as e:
+        print(f"ChatGPT ERROR: {e}")
         return "ChatGPT ERROR"
 
 
@@ -68,8 +68,8 @@ def ChatGPT_request(prompt):
         completion = create_completion(prompt)
         return completion["choices"][0]["message"]["content"]
 
-    except:
-        print("ChatGPT ERROR")
+    except Exception as e:
+        print(f"ChatGPT ERROR: {e}")
         return "ChatGPT ERROR"
 
 
@@ -109,7 +109,8 @@ def GPT4_safe_generate_response(
                 print(curr_gpt_response)
                 print("~~~~")
 
-        except:
+        except Exception as e:
+            print(f"GPT4_safe_generate_response ERROR: {e}")
             pass
 
     return False
@@ -156,7 +157,8 @@ def ChatGPT_safe_generate_response(
                 print(curr_gpt_response)
                 print("~~~~")
 
-        except:
+        except Exception as e:
+            print(f"ChatGPT_safe_generate_response ERROR: {e}")
             pass
 
     return False
@@ -184,7 +186,8 @@ def ChatGPT_safe_generate_response_OLD(
                 print(curr_gpt_response)
                 print("~~~~")
 
-        except:
+        except Exception as e:
+            print(f"ChatGPT_safe_generate_response ERROR: {e}")
             pass
     print("FAIL SAFE TRIGGERED")
     return fail_safe_response
@@ -210,8 +213,8 @@ def GPT_request(prompt, gpt_parameter):
     temp_sleep()
     try:
         return gpt_request(prompt, gpt_parameter)
-    except:
-        print("TOKEN LIMIT EXCEEDED")
+    except Exception as e:
+        print(f"TOKEN LIMIT EXCEEDED: {e}")
         return "TOKEN LIMIT EXCEEDED"
 
 
@@ -229,7 +232,7 @@ def generate_prompt(curr_input, prompt_lib_file):
     RETURNS:
       a str prompt that will be sent to OpenAI's GPT server.
     """
-    if type(curr_input) == type("string"):
+    if isinstance(curr_input, str):
         curr_input = [curr_input]
     curr_input = [str(i) for i in curr_input]
 
