@@ -111,12 +111,12 @@ class ReverieServer:
         # This dictionary is meant to keep track of all personas who are part of
         # the Reverie instance.
         # e.g., ["Isabella Rodriguez"] = Persona("Isabella Rodriguezs")
-        self.personas = dict()
+        self.personas: dict[str, Persona] = {}
         # <personas_tile> is a dictionary that contains the tile location of
         # the personas (!-> NOT px tile, but the actual tile coordinate).
         # The tile take the form of a set, (row, col).
         # e.g., ["Isabella Rodriguez"] = (58, 39)
-        self.personas_tile = dict()
+        self.personas_tile: dict[str, tuple[int, int]] = dict()
 
         # # <persona_convo_match> is a dictionary that describes which of the two
         # # personas are talking to each other. It takes a key of a persona's full

@@ -8,9 +8,26 @@ world in a 2-dimensional matrix.
 
 import json
 import math
+from typing import Set, Tuple
+
+from pydantic import BaseModel, Field
 
 from global_methods import read_file_to_list
 from utils import env_matrix
+
+
+class Tile(BaseModel):
+    world: str
+    sector: str
+    arena: str
+    game_object: str
+    spawning_location: str
+    collision: bool
+    events: Set[Tuple] = Field(default_factory=set)
+
+    def __getitem__(self, item):
+        # Preserve legacy dict-style access.
+        return getattr(self, item)
 
 
 class Maze:
@@ -114,68 +131,45 @@ class Maze:
             spawning_location_maze += [spawning_location_maze_raw[i : i + tw]]
 
         # Once we are done loading in the maze, we now set up self.tiles. This is
-        # a matrix accessed by row:col where each access point is a dictionary
+        # a matrix accessed by row:col where each access point is a Tile model
         # that contains all the things that are taking place in that tile.
-        # More specifically, it contains information about its "world," "sector,"
-        # "arena," "game_object," "spawning_location," as well as whether it is a
-        # collision block, and a set of all events taking place in it.
-        # e.g., self.tiles[32][59] = {'world': 'double studio',
-        #            'sector': '', 'arena': '', 'game_object': '',
-        #            'spawning_location': '', 'collision': False, 'events': set()}
-        # e.g., self.tiles[9][58] = {'world': 'double studio',
-        #         'sector': 'double studio', 'arena': 'bedroom 2',
-        #         'game_object': 'bed', 'spawning_location': 'bedroom-2-a',
-        #         'collision': False,
-        #         'events': {('double studio:double studio:bedroom 2:bed',
-        #                    None, None)}}
-        self.tiles = []
+        self.tiles: list[list[Tile]] = []
         for i in range(self.maze_height):
             row = []
             for j in range(self.maze_width):
-                tile_details = dict()
-                tile_details["world"] = wb
+                world = wb
+                sector = sb_dict.get(sector_maze[i][j], "")
+                arena = ab_dict.get(arena_maze[i][j], "")
+                game_object = gob_dict.get(game_object_maze[i][j], "")
+                spawning_location = slb_dict.get(spawning_location_maze[i][j], "")
+                collision = self.collision_maze[i][j] != "0"
 
-                tile_details["sector"] = ""
-                if sector_maze[i][j] in sb_dict:
-                    tile_details["sector"] = sb_dict[sector_maze[i][j]]
+                tile = Tile(
+                    world=world,
+                    sector=sector,
+                    arena=arena,
+                    game_object=game_object,
+                    spawning_location=spawning_location,
+                    collision=collision,
+                )
 
-                tile_details["arena"] = ""
-                if arena_maze[i][j] in ab_dict:
-                    tile_details["arena"] = ab_dict[arena_maze[i][j]]
-
-                tile_details["game_object"] = ""
-                if game_object_maze[i][j] in gob_dict:
-                    tile_details["game_object"] = gob_dict[game_object_maze[i][j]]
-
-                tile_details["spawning_location"] = ""
-                if spawning_location_maze[i][j] in slb_dict:
-                    tile_details["spawning_location"] = slb_dict[
-                        spawning_location_maze[i][j]
-                    ]
-
-                tile_details["collision"] = False
-                if self.collision_maze[i][j] != "0":
-                    tile_details["collision"] = True
-
-                tile_details["events"] = set()
-
-                row += [tile_details]
+                row.append(tile)
             self.tiles += [row]
         # Each game object occupies an event in the tile. We are setting up the
         # default event value here.
         for i in range(self.maze_height):
             for j in range(self.maze_width):
-                if self.tiles[i][j]["game_object"]:
+                if self.tiles[i][j].game_object:
                     object_name = ":".join(
                         [
-                            self.tiles[i][j]["world"],
-                            self.tiles[i][j]["sector"],
-                            self.tiles[i][j]["arena"],
-                            self.tiles[i][j]["game_object"],
+                            self.tiles[i][j].world,
+                            self.tiles[i][j].sector,
+                            self.tiles[i][j].arena,
+                            self.tiles[i][j].game_object,
                         ]
                     )
                     go_event = (object_name, None, None, None)
-                    self.tiles[i][j]["events"].add(go_event)
+                    self.tiles[i][j].events.add(go_event)
 
         # Reverse tile access.
         # <self.address_tiles> -- given a string address, we return a set of all
@@ -185,27 +179,27 @@ class Maze:
         # self.address_tiles['<spawn_loc>bedroom-2-a'] == {(58, 9)}
         # self.address_tiles['double studio:recreation:pool table']
         #   == {(29, 14), (31, 11), (30, 14), (32, 11), ...},
-        self.address_tiles = dict()
+        self.address_tiles: dict[str, set[tuple[int, int]]] = dict()
         for i in range(self.maze_height):
             for j in range(self.maze_width):
-                addresses = []
-                if self.tiles[i][j]["sector"]:
-                    add = f"{self.tiles[i][j]['world']}:"
-                    add += f"{self.tiles[i][j]['sector']}"
+                addresses: list[str] = []
+                if self.tiles[i][j].sector:
+                    add = f"{self.tiles[i][j].world}:{self.tiles[i][j].sector}"
                     addresses += [add]
-                if self.tiles[i][j]["arena"]:
-                    add = f"{self.tiles[i][j]['world']}:"
-                    add += f"{self.tiles[i][j]['sector']}:"
-                    add += f"{self.tiles[i][j]['arena']}"
+                if self.tiles[i][j].arena:
+                    add = (
+                        f"{self.tiles[i][j].world}:{self.tiles[i][j].sector}:"
+                        f"{self.tiles[i][j].arena}"
+                    )
                     addresses += [add]
-                if self.tiles[i][j]["game_object"]:
-                    add = f"{self.tiles[i][j]['world']}:"
-                    add += f"{self.tiles[i][j]['sector']}:"
-                    add += f"{self.tiles[i][j]['arena']}:"
-                    add += f"{self.tiles[i][j]['game_object']}"
+                if self.tiles[i][j].game_object:
+                    add = (
+                        f"{self.tiles[i][j].world}:{self.tiles[i][j].sector}:"
+                        f"{self.tiles[i][j].arena}:{self.tiles[i][j].game_object}"
+                    )
                     addresses += [add]
-                if self.tiles[i][j]["spawning_location"]:
-                    add = f"<spawn_loc>{self.tiles[i][j]['spawning_location']}"
+                if self.tiles[i][j].spawning_location:
+                    add = f"<spawn_loc>{self.tiles[i][j].spawning_location}"
                     addresses += [add]
 
                 for add in addresses:
@@ -343,7 +337,7 @@ class Maze:
         """
         self.tiles[tile[1]][tile[0]]["events"].add(curr_event)
 
-    def remove_event_from_tile(self, curr_event, tile):
+    def remove_event_from_tile(self, curr_event, tile: tuple[int, int]):
         """
         Remove an event triple from a tile.
 

@@ -2,8 +2,8 @@ import openai
 import os
 
 
-#openai.api_base = "http://192.168.86.67:1234/v1"
-openai.api_base = "http://localhost:1234/v1"
+openai.api_base = "http://192.168.86.67:1234/v1"
+#openai.api_base = "http://localhost:1234/v1"
 openai.api_key = os.getenv("OPENAI_KEY", "sk-test")
 
 EMBEDDING_MODEL = "text-embedding-embeddinggemma-300m-qat"
