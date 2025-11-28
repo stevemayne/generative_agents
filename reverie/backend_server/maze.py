@@ -8,7 +8,6 @@ world in a 2-dimensional matrix.
 
 import json
 import math
-from typing import Set, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -23,7 +22,7 @@ class Tile(BaseModel):
     game_object: str
     spawning_location: str
     collision: bool
-    events: Set[Tuple] = Field(default_factory=set)
+    events: set[tuple] = Field(default_factory=set)
 
     def __getitem__(self, item):
         # Preserve legacy dict-style access.
