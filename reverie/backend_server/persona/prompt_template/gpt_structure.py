@@ -97,8 +97,10 @@ def GPT4_safe_generate_response(
     for i in range(repeat):
         try:
             curr_gpt_response = GPT4_request(prompt).strip()
+            # Some models wrap JSON in Markdown fences; trim to the first brace.
+            start_index = curr_gpt_response.find("{")
             end_index = curr_gpt_response.rfind("}") + 1
-            curr_gpt_response = curr_gpt_response[:end_index]
+            curr_gpt_response = curr_gpt_response[start_index:end_index]
             curr_gpt_response = json.loads(curr_gpt_response)["output"]
 
             if func_validate(curr_gpt_response, prompt=prompt):
@@ -141,8 +143,9 @@ def ChatGPT_safe_generate_response(
     for i in range(repeat):
         try:
             curr_gpt_response = ChatGPT_request(prompt).strip()
+            start_index = curr_gpt_response.find("{")
             end_index = curr_gpt_response.rfind("}") + 1
-            curr_gpt_response = curr_gpt_response[:end_index]
+            curr_gpt_response = curr_gpt_response[start_index:end_index]
             curr_gpt_response = json.loads(curr_gpt_response)["output"]
 
             # print ("---ashdfaf")
@@ -158,7 +161,8 @@ def ChatGPT_safe_generate_response(
                 print("~~~~")
 
         except Exception as e:
-            print(f"ChatGPT_safe_generate_response ERROR: {e}")
+            print(f"ChatGPT_safe_generate_response ERROR: {curr_gpt_response}")
+            print(f"                               ERROR: {e}")
             pass
 
     return False

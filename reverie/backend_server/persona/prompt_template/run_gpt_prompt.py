@@ -880,15 +880,6 @@ def run_gpt_prompt_pronunciatio(action_description, persona, verbose=False):
             cr = cr[:3]
         return cr
 
-    def __func_validate(gpt_response, prompt=""):
-        try:
-            __func_clean_up(gpt_response, prompt="")
-            if len(gpt_response) == 0:
-                return False
-        except:
-            return False
-        return True
-
     def get_fail_safe():
         fs = "😋"
         return fs
@@ -1782,13 +1773,6 @@ def run_gpt_prompt_summarize_conversation(
     def __func_clean_up(gpt_response, prompt=""):
         ret = "conversing about " + gpt_response.strip()
         return ret
-
-    def __func_validate(gpt_response, prompt=""):
-        try:
-            __func_clean_up(gpt_response, prompt)
-            return True
-        except:
-            return False
 
     def get_fail_safe():
         return "conversing with a housemate about morning greetings"

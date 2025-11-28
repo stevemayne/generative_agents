@@ -26,10 +26,11 @@ import math
 import os
 import shutil
 import logging
+import sys
+from pathlib import Path
 
 from global_methods import (
     copyanything,
-    create_folder_if_not_there,
     check_if_file_exists,
     read_file_to_list,
 )
@@ -37,6 +38,11 @@ from persona.cognitive_modules.converse import load_history_via_whisper
 from utils import fs_storage, fs_temp_storage, maze_assets_loc
 from maze import Maze
 from persona.persona import Persona
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from ipc.frontend_interface import FrontendInterface  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +65,7 @@ class ReverieServer:
         # reverie/meta/json's fork variable.
         self.sim_code = sim_code
         sim_folder = f"{fs_storage}/{self.sim_code}"
+        self.frontend = FrontendInterface(self.sim_code)
         copyanything(fork_folder, sim_folder)
 
         with open(f"{sim_folder}/reverie/meta.json") as json_file:
@@ -124,8 +131,11 @@ class ReverieServer:
         # self.persona_convo = dict()
 
         # Loading in all personas.
-        init_env_file = f"{sim_folder}/environment/{str(self.step)}.json"
-        init_env = json.load(open(init_env_file))
+        init_env = self.frontend.read_environment(self.step)
+        if init_env is None:
+            raise FileNotFoundError(
+                f"Environment for step {self.step} not found for {self.sim_code}"
+            )
         for persona_name in reverie_meta["persona_names"]:
             persona_folder = f"{sim_folder}/personas/{persona_name}"
             p_x = init_env[persona_name]["x"]
@@ -149,14 +159,14 @@ class ReverieServer:
         # used to communicate the code and step information to the frontend.
         # Note that step file is removed as soon as the frontend opens up the
         # simulation.
-        curr_sim_code = dict()
-        curr_sim_code["sim_code"] = self.sim_code
-        with open(f"{fs_temp_storage}/curr_sim_code.json", "w") as outfile:
+        curr_sim_code = {"sim_code": self.sim_code}
+        curr_step = {"step": self.step}
+        curr_paths = Path(fs_temp_storage)
+        curr_paths.mkdir(parents=True, exist_ok=True)
+        with open(curr_paths / "curr_sim_code.json", "w") as outfile:
             outfile.write(json.dumps(curr_sim_code, indent=2))
 
-        curr_step = dict()
-        curr_step["step"] = self.step
-        with open(f"{fs_temp_storage}/curr_step.json", "w") as outfile:
+        with open(curr_paths / "curr_step.json", "w") as outfile:
             outfile.write(json.dumps(curr_step, indent=2))
 
     def save(self):
@@ -304,7 +314,7 @@ class ReverieServer:
           None
         """
         # <sim_folder> points to the current simulation folder.
-        sim_folder = f"{fs_storage}/{self.sim_code}"
+        # sim_folder = f"{fs_storage}/{self.sim_code}"
 
         # When a persona arrives at a game object, we give a unique event
         # to that object.
@@ -322,24 +332,12 @@ class ReverieServer:
             if int_counter == 0:
                 break
 
-            # <curr_env_file> file is the file that our frontend outputs. When the
-            # frontend has done its job and moved the personas, then it will put a
-            # new environment file that matches our step count. That's when we run
-            # the content of this for loop. Otherwise, we just wait.
-            curr_env_file = f"{sim_folder}/environment/{self.step}.json"
-            if check_if_file_exists(curr_env_file):
-                # If we have an environment file, it means we have a new perception
-                # input to our personas. So we first retrieve it.
-                try:
-                    # Try and save block for robustness of the while loop.
-                    with open(curr_env_file) as json_file:
-                        new_env = json.load(json_file)
-                        env_retrieved = True
-                except Exception as e:
-                    logger.warning(f"Environment Retrieval ERROR: {e}")
-                    pass
+            env_retrieved = False
+            new_env = self.frontend.read_environment(self.step)
+            if new_env is not None:
+                env_retrieved = True
 
-                if env_retrieved:
+            if env_retrieved:
                     # This is where we go through <game_obj_cleanup> to clean up all
                     # object actions that were used in this cylce.
                     for key, val in game_obj_cleanup.items():
@@ -429,11 +427,7 @@ class ReverieServer:
                     # {"persona": {"Maria Lopez": {"movement": [58, 9]}},
                     #  "persona": {"Klaus Mueller": {"movement": [38, 12]}},
                     #  "meta": {curr_time: <datetime>}}
-                    curr_move_file = f"{sim_folder}/movement/{self.step}.json"
-                    # Ensure the movement directory exists before writing
-                    create_folder_if_not_there(curr_move_file)
-                    with open(curr_move_file, "w") as outfile:
-                        outfile.write(json.dumps(movements, indent=2))
+                    self.frontend.write_movement(self.step, movements)
 
                     # After this cycle, the world takes one step forward, and the
                     # current time moves by <sec_per_step> amount.

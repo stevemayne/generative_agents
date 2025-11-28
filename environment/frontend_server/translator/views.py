@@ -17,6 +17,13 @@ from global_methods import *
 
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from .models import *
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from ipc.frontend_interface import FrontendInterface  # noqa: E402
 
 
 def landing(request):
@@ -278,9 +285,8 @@ def process_environment(request):
     step = data["step"]
     sim_code = data["sim_code"]
     environment = data["environment"]
-
-    with open(f"storage/{sim_code}/environment/{step}.json", "w") as outfile:
-        outfile.write(json.dumps(environment, indent=2))
+    iface = FrontendInterface(sim_code)
+    iface.write_environment(step, environment)
 
     return HttpResponse("received")
 
@@ -305,17 +311,18 @@ def update_environment(request):
     data = json.loads(request.body)
     step = data["step"]
     sim_code = data["sim_code"]
+    iface = FrontendInterface(sim_code)
 
     response_data = {"<step>": -1}
-    if check_if_file_exists(f"storage/{sim_code}/movement/{step}.json"):
-        with open(f"storage/{sim_code}/movement/{step}.json") as json_file:
-            response_data = json.load(json_file)
-            response_data["<step>"] = step
+    movement = iface.read_movement(step)
+    if movement is not None:
+        response_data = movement
+        response_data["<step>"] = step
 
     return JsonResponse(response_data)
 
 
-def path_tester_update(request):
+def path_tester_update(request): 
     """
     Processing the path and saving it to path_tester_env.json temp storage for
     conducting the path tester.
