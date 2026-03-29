@@ -40,7 +40,6 @@
 		persona_names[x[0]] = [parseInt(x[1]), parseInt(x[2])]
 	}
 
-
 	// Phaser 3.0 global settings. 
 	// Configuration meant to be passed to the main Phaser game instance. 
 	const config = {
@@ -330,6 +329,8 @@
 
 
 	function update(time, delta) {
+	  // Debug: confirm the update loop is ticking and phases advance.
+	  console.log("phase:", phase, "step:", step);
 		// *** SETUP PLAY AND PAUSE BUTTON *** 
 		let play_context = this;
 		function game_resume() {  
@@ -551,8 +552,6 @@
 	var play_button=document.getElementById("play_button");
 	var pause_button=document.getElementById("pause_button");
 </script>
-
-
 
 
 
